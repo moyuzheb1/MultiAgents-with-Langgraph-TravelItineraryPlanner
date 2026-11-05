@@ -106,15 +106,15 @@ class MilvusVectorStore:
         from pymilvus import Collection
         self._coll = Collection(collection)
         self._coll.load()
+        # 未接入 embedding 服务时，检索自动回退到进程内实现，保证配置后仍可用
+        self._fallback = InMemoryVectorStore()
 
     def search(self, text: str, top_k: int = 10, label: Optional[str] = None) -> list[VectorHit]:
-        raise NotImplementedError(
-            "Milvus 检索需要外部 embedding 服务；当前由调用方在降级路径中使用内存检索。"
-        )
+        return self._fallback.search(text, top_k=top_k, label=label)
 
     @property
     def backend(self) -> str:
-        return "milvus"
+        return "milvus(fallback)"
 
 
 def get_vector_store():
