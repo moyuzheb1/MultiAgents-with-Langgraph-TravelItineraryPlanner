@@ -6,3 +6,4 @@ __pycache__/
 apik.txt
 *.log
 fonts/
+.pytest_cache/
