@@ -116,7 +116,7 @@ MultiAgents-with-Langgraph-TravelItineraryPlanner/
 3. 配置 Key（任选其一）：
    - 将 Key 字符串写入项目根目录 `apik.txt`（**优先级最高**）
    - 或在 `.env` 中设置 `OPENROUTER_API_KEY`
-4. 设置模型（`.env`）：`OPENROUTER_MODEL=deepseek/deepseek-v4-flash-0731`（可替换为任意 OpenRouter 模型）
+4. 设置模型（`.env`）：`OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash-1017`（可替换为任意 OpenRouter 模型）
 
 > 部分模型存在地区限制（返回 `403 This model is not available in your region`），更换模型即可。
 
@@ -143,7 +143,7 @@ python evals/run.py
 
 **未检测到 API Key？** 检查 `apik.txt` 或 `.env`，且 `apik.txt` 优先级高于同名环境变量。
 
-**智能体增强模式很慢？** `deepseek-v4-flash-0731` 为推理型模型，单次请求可能数十秒到数分钟；日常体验与评测建议用「快速模式」（确定性、秒级，架构与防御机制完全一致，仅检索/规划改用规则实现）。
+**智能体增强模式很慢？** `deepseek-v4.1-flash-1017` 为推理型模型，单次请求可能数十秒到数分钟；日常体验与评测建议用「快速模式」（确定性、秒级，架构与防御机制完全一致，仅检索/规划改用规则实现）。
 
 **想接真实 Neo4j / Milvus / Redis？** 设置对应环境变量（见上表）且网络可达即可，代码会自动切换，无需改业务逻辑。
 
