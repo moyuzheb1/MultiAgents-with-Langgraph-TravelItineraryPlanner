@@ -1,0 +1,6 @@
+针对"带老人/小孩家庭游深圳"的高约束、零容错场景中，传统单 Agent 在长链路推理中存在的意图漂移、幻觉不可控、状态丢失等工程痛点,设计并落地了一套多智能体协同的 GraphRAG 行中管家系统。
+技术栈：LangGraph / LangChain  Multi-Agent  Neo4j  Milvus  Redis  Python
+设计 Supervisor-Worker 多智能体 DAG 执行链路：基于 LangGraph 构建 Router → Planner → 并发 Workers → Critic 四阶段状态图；通过 TypedDict 定义全局 State Schema，实现 Agent 间消息隔离与上下文精准注入；利用条件边（Conditional Edges） 实现 Critic 校验失败时的自动回跳重规划，解决单 Agent 长链路意图漂移问题，复杂约束 Query 执行成功率提升至 92%。
+构建高并发异构检索与 Text2Cypher 防御性纠错链路：在 Worker 层采用 asyncio.gather 实现图谱/向量/API 三路并发拉取，端到端延迟降低 65%；针对 Text2Cypher 易错痛点，设计 “生成 → AST Schema 校验 → LLM Rewrite → 向量降级” 四步 Fallback Pipeline，将图谱查询语法错误率从 38% 降至 4%，保障“距离酒店3km内+无障碍+清淡餐厅”等多跳推理的稳定性。
+实现 Reflection 机制的安全护栏与状态闭环：串联独立 Critic Agent，通过结构化 Prompt 强制校验输出是否违反硬约束（老人体力阈值/餐厅营业状态/天气预警）；设计 “拦截 → 触发 Replan → 局部 State 更新” 反馈边，使系统具备自我纠错能力；结合三层 Memory（会话/行程/用户）的 Hook 注入机制，支撑台风突发等行中动态重规划，安全类致命错误推荐率降至 0。
+搭建双轨制评测体系与数据质量闭环：基于 RAGAS 构建自动化评测流水线（Answer Correctness / Faithfulness / Context Recall），同时建立 50+ 条 Golden Test Set 覆盖“轮椅出行/暴雨重规划/海鲜排档避坑”等长尾场景；通过 LangSmith 全链路 Trace 定位瓶颈节点，驱动 Schema 迭代与 Prompt 优化，使约束满足率在 3 轮迭代内从 62% 提升至 91%。

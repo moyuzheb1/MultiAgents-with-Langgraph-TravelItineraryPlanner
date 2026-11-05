@@ -1,0 +1,9 @@
+streamlit>=1.38.0
+langchain-community>=0.2.16
+langchain-openai>=0.1.23
+langgraph>=0.2.14
+python-dotenv>=1.0.1
+# 可选（未安装时自动回退到进程内零依赖实现）：
+# neo4j>=5.0
+# pymilvus>=2.4
+# redis>=5.0
