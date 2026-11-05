@@ -196,6 +196,17 @@ def main() -> None:
         for name, payload in (state.get("worker_results") or {}).items():
             if payload.get("error"):
                 st.caption(f"{name}：{payload['error']}")
+        # GraphRAG：展示多跳路径证据
+        for name, payload in (state.get("worker_results") or {}).items():
+            rows = payload.get("data") or []
+            if name in ("poi", "dining") and isinstance(rows, list) and rows:
+                with st.expander(f"🕸️ {name} · GraphRAG 多跳路径（前 5 条）", expanded=False):
+                    for r in rows[:5]:
+                        st.markdown(
+                            f"- **{r.get('name', '')}** ｜ hops={r.get('graph_hops')} "
+                            f"｜ score={r.get('graph_score')}")
+                        for p in (r.get("graph_path") or []):
+                            st.caption(f"  `{p}`")
 
     with tab3:
         render_critic(state.get("critic_report", {}))

@@ -7,6 +7,7 @@
 未配置或连不通时自动回退到零依赖的进程内实现，保证系统开箱可运行。
 """
 from retrieval.cache import get_cache
+from retrieval.graph_rag import area_summary, graph_rag_search
 from retrieval.graph_store import CypherError, get_graph_store, parse_cypher
 from retrieval.text2cypher import RetrievalResult, retrieve, retrieve_sync
 from retrieval.vector_store import get_vector_store
@@ -20,4 +21,6 @@ __all__ = [
     "retrieve",
     "retrieve_sync",
     "RetrievalResult",
+    "graph_rag_search",
+    "area_summary",
 ]

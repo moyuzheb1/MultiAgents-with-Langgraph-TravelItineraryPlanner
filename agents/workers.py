@@ -15,7 +15,7 @@ if sys.platform == "win32":  # 避免 Windows Proactor 事件循环退出时的�
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from core.state import WorkerPayload
-from retrieval import get_cache, get_graph_store, get_vector_store, retrieve
+from retrieval import get_cache, get_graph_store, get_vector_store, graph_rag_search, retrieve
 
 MONTH_TEMP = {
     1: "12-18℃", 2: "14-20℃", 3: "17-23℃", 4: "21-27℃",
@@ -102,14 +102,23 @@ async def _poi_task(constraints, plan, ctx) -> WorkerPayload:
     started = time.time()
     question = _poi_question(constraints, plan)
     if _fast_mode():
-        hits = ctx["vector"].search(question, top_k=20, label="POI")
-        return WorkerPayload(source="vector", status="ok",
-                             data=[h.as_dict() for h in hits],
+        # 快速模式也走真实的图检索（多跳 GraphRAG），而非纯向量
+        rows = graph_rag_search(question, label_hint="POI", top_k=20,
+                                constraints=constraints, plan=plan,
+                                vector_store=ctx["vector"])
+        return WorkerPayload(source="graph_rag", status="ok", data=rows,
                              latency_ms=int((time.time() - started) * 1000))
 
     res = await retrieve(question, label_hint="POI", top_k=20,
                          constraints=constraints, graph_store=ctx["graph"],
                          vector_store=ctx["vector"], cache=ctx["cache"])
+    if res.status in ("degraded", "error") or not res.rows:
+        rows = graph_rag_search(question, label_hint="POI", top_k=20,
+                                constraints=constraints, plan=plan,
+                                vector_store=ctx["vector"])
+        return WorkerPayload(source="graph_rag", status="degraded", data=rows,
+                             latency_ms=int((time.time() - started) * 1000),
+                             error=res.error)
     return WorkerPayload(source=res.source, status=res.status, data=res.rows,
                          latency_ms=res.latency_ms, error=res.error)
 
@@ -118,14 +127,22 @@ async def _dining_task(constraints, plan, hotel_name, ctx) -> WorkerPayload:
     started = time.time()
     question = _dining_question(constraints, plan, hotel_name)
     if _fast_mode():
-        hits = ctx["vector"].search(question, top_k=20, label="Restaurant")
-        return WorkerPayload(source="vector", status="ok",
-                             data=[h.as_dict() for h in hits],
+        rows = graph_rag_search(question, label_hint="Restaurant", top_k=20,
+                                constraints=constraints, plan=plan,
+                                vector_store=ctx["vector"])
+        return WorkerPayload(source="graph_rag", status="ok", data=rows,
                              latency_ms=int((time.time() - started) * 1000))
 
     res = await retrieve(question, label_hint="Restaurant", top_k=20,
                          constraints=constraints, graph_store=ctx["graph"],
                          vector_store=ctx["vector"], cache=ctx["cache"])
+    if res.status in ("degraded", "error") or not res.rows:
+        rows = graph_rag_search(question, label_hint="Restaurant", top_k=20,
+                                constraints=constraints, plan=plan,
+                                vector_store=ctx["vector"])
+        return WorkerPayload(source="graph_rag", status="degraded", data=rows,
+                             latency_ms=int((time.time() - started) * 1000),
+                             error=res.error)
     return WorkerPayload(source=res.source, status=res.status, data=res.rows,
                          latency_ms=res.latency_ms, error=res.error)
 

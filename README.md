@@ -45,7 +45,15 @@
 知识图谱查询走「**生成 → AST/Schema 校验 → LLM 重写 → 向量降级**」四步 Fallback Pipeline：
 - Schema 白名单强制校验：**任何不在白名单的标签 / 关系 / 属性 / 语法都会被拦截并触发重写或直接降级**，从源头杜绝模型臆造图谱结构；
 - 任意一步失败都被完整记录在 `retrieval_trace` 中，形成可观测链路（便于 LangSmith / 评测分析瓶颈）；
-- 降级不是失败：即使 LLM 生成的 Cypher 完全不可用，也能通过向量检索给出可用召回。
+- 降级不是失败：即使 LLM 生成的 Cypher 完全不可用，也能通过多跳 GraphRAG / 向量检索给出可用召回。
+
+### 1.1 多跳 GraphRAG 检索（`retrieval/graph_rag.py`）
+在实体图上做两跳关系推理，并输出可解释的路径证据：
+- 关系路径：`(:POI)-[:LOCATED_IN]->(:Area)`、`(:POI|:Restaurant)-[:NEAR]->(:Hotel)`、`(:POI)-[:LOCATED_IN]->(:Area)<-[:LOCATED_IN]-(:Restaurant)`；
+- 混合排序：图路径权重 + 硬约束契合度 + 向量相似度；
+- 每条结果附带 `graph_hops` / `graph_path` / `graph_score`，可在「检索链路」中查看推理依据；
+- `area_summary()` 提供区域级社区摘要（数量 / 室内占比 / 平均强度 / 高频标签）；
+- 快速模式默认走该路径，Text2Cypher 降级时也以其兜底——保证核心检索链路在无 LLM 时同样可运行、可评测。
 
 ### 2. 幻觉不可控 → Planner 骨架 + Assembler 确定性物化
 - Planner **只输出行程骨架**（天数/区域/主题/时段框架/体力预算），不指定任何具体点位；
@@ -70,7 +78,7 @@
 | 向量 | `MILVUS_URI` | 字符二元组 TF-IDF 余弦（无需 embedding） |
 | 缓存 | `REDIS_URL` | 进程内 TTL 缓存 |
 
-种子知识库为「深圳家庭游」示例数据（`data/shenzhen.py`），接入真实业务时替换为权威数据源即可。
+种子知识库为「深圳家庭游」示例数据（`data/shenzhen.py`），共约 **195 个实体**（109 个 POI / 76 家餐厅 / 10 家酒店）。其中前 54 个为人工整理的种子数据，其余为**程序化合成的扩展数据**（用于检索与评测规模测试，坐标为区中心附近的合理占位值）；接入真实业务时替换为权威数据源即可。
 
 ---
 
@@ -87,6 +95,7 @@ MultiAgents-with-Langgraph-TravelItineraryPlanner/
 ├── retrieval/
 │   ├── schema.py       # 图谱 Schema（Text2Cypher 校验依据）
 │   ├── graph_store.py  # 可插拔图存储 + 受控 Cypher 解析器
+│   ├── graph_rag.py    # 多跳 GraphRAG（图遍历 + 向量混合排序 + 区域摘要）
 │   ├── vector_store.py # 可插拔向量检索
 │   ├── cache.py        # 可插拔缓存
 │   └── text2cypher.py  # 四步 Fallback Pipeline
@@ -94,11 +103,14 @@ MultiAgents-with-Langgraph-TravelItineraryPlanner/
 │   ├── router.py / planner.py / workers.py / assembler.py
 │   ├── critic.py / replanner.py / supervisor.py
 │   └── __init__.py
-├── data/shenzhen.py    # 深圳种子知识库（示例数据）
-├── evals/run.py        # 回归评测集（验证三大防御机制）
+├── data/shenzhen.py    # 深圳种子知识库（195 实体，含合成扩展）
+├── evals/run.py        # 可执行回归脚本（验证三大防御机制）
+├── tests/              # pytest 测试套件（CI 使用）
+├── legacy/             # 原始开源项目的遗留 agent（仅存档，不参与运行）
+├── pytest.ini
 ├── travel_agent.py     # Streamlit 可视化控制台
 ├── requirements.txt
-├── apik.txt            # OpenRouter API Key（优先读取）
+├── apik.txt            # OpenRouter API Key（优先读取，已在 .gitignore）
 └── .env
 ```
 
@@ -131,13 +143,14 @@ streamlit run travel_agent.py
 - 行程结果、检索链路（Text2Cypher Fallback）、Critic 校验报告、Replan 回跳历史、三层记忆、架构 DAG 可视化
 - 一键导出 Markdown 行程
 
-## 回归评测
+## 测试与回归
 
 ```powershell
-python evals/run.py
+pytest                 # 27 个用例，CI 同款
+python evals/run.py    # 可读的回归脚本输出
 ```
 
-评测集在 FAST_MODE 下运行，覆盖：硬约束抽取、Text2Cypher 防御校验、Critic 硬约束校验、Replan 回跳收敛、端到端生成，全绿即通过。
+`tests/` 覆盖：数据规模与 ID 唯一性、硬约束抽取、Text2Cypher 防御校验、Critic 硬约束、Replan 收敛、GraphRAG 多跳路径、端到端生成。CI 配置见 `.github/workflows/ci.yml`（Python 3.9 + pytest）。
 
 ## 常见问题
 
