@@ -60,14 +60,12 @@ def replanner_node(state: dict) -> dict:
         "next": next_hop,
     }
 
-    # 追加而非覆盖，保证回跳历史在 UI 中完整可见
-    history = list(state.get("replan_history", []) or [])
-    history.append(entry)
-
+    # TravelState.replan_history 使用 operator.add 归约器：
+    # 这里只返回本轮新增的一条，由框架负责累积，避免重复。
     return {
         "constraints": constraints,
         "replan_count": replan_count,
-        "replan_history": history,
+        "replan_history": [entry],
         "_next": next_hop,
     }
 

@@ -144,6 +144,9 @@ def validate_plan(plan: dict, constraints: dict, weather: dict, hotel_name: str 
     slots = plan.get("slots", []) or []
 
     for slot in slots:
+        # 休息槽位是合法占位，不引用知识库实体，跳过实体校验
+        if slot.get("kind") == "rest":
+            continue
         ent = ENTITY_INDEX.get(slot.get("ref_id", ""))
         if ent is None:
             violations.append({
