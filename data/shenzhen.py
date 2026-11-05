@@ -172,6 +172,126 @@ HOTELS = [
 ]
 
 
+# ==================== 程序化扩展的种子数据 ====================
+# 说明：以下为**合成种子数据**，用于把检索/评测规模从 54 扩展到约 200 个实体。
+# 名称、坐标、营业信息均为合理占位值；接入真实业务时应替换为权威数据源。
+import hashlib as _hashlib
+import random as _random
+
+_DISTRICT_CENTERS = {
+    "南山区": (22.5300, 113.9400),
+    "福田区": (22.5450, 114.0600),
+    "罗湖区": (22.5480, 114.1200),
+    "盐田区": (22.5900, 114.2800),
+    "龙岗区": (22.7000, 114.2000),
+    "宝安区": (22.5700, 113.8800),
+    "龙华区": (22.6500, 114.0300),
+    "光明区": (22.7500, 113.9300),
+    "大鹏新区": (22.5900, 114.4800),
+}
+
+_POI_KINDS = [
+    ("中心公园", "公园", False, ["草坪", "散步", "免费"]),
+    ("图书馆", "展馆", True, ["室内", "免费", "安静"]),
+    ("博物馆", "展馆", True, ["室内", "历史", "科普"]),
+    ("体育中心", "场馆", False, ["运动", "健身"]),
+    ("文化馆", "展馆", True, ["室内", "展览"]),
+    ("湿地公园", "公园", False, ["湿地", "观鸟", "步道"]),
+    ("儿童乐园", "主题乐园", False, ["亲子", "游乐"]),
+    ("商业广场", "商圈", True, ["购物", "餐饮", "室内"]),
+    ("美术馆", "展馆", True, ["室内", "艺术", "拍照"]),
+]
+
+_RESTAURANT_KINDS = [
+    ("老字号粤菜馆", "粤菜", 4, ["老字号", "家庭聚餐"]),
+    ("清淡粥铺", "粥品", 5, ["清淡", "老人友好"]),
+    ("亲子餐厅", "融合菜", 4, ["儿童友好", "亲子"]),
+    ("素食馆", "素食", 5, ["素食", "清淡"]),
+    ("客家菜馆", "客家菜", 4, ["地方特色", "家庭聚餐"]),
+    ("茶餐厅", "粤式简餐", 4, ["平价", "连锁"]),
+]
+
+_NEW_HOTELS = [
+    ("h05", "深圳南山希尔顿花园酒店", "南山区"),
+    ("h06", "深圳罗湖万象城君悦酒店", "罗湖区"),
+    ("h07", "深圳宝安中心希尔顿酒店", "宝安区"),
+    ("h08", "深圳龙华壹方城亚朵酒店", "龙华区"),
+    ("h09", "深圳大鹏金沙湾万豪酒店", "大鹏新区"),
+    ("h10", "深圳光明科学城亚朵酒店", "光明区"),
+]
+
+
+def _seed(*parts) -> int:
+    """稳定的整数种子（不受 PYTHONHASHSEED 影响）。"""
+    raw = "|".join(str(p) for p in parts)
+    return int(_hashlib.md5(raw.encode("utf-8")).hexdigest(), 16)
+
+
+def _jitter(rng, base, spread=0.025):
+    return round(base + rng.uniform(-spread, spread), 4)
+
+
+def _expand_pois():
+    out = []
+    n = 29
+    for dist, (clat, clng) in _DISTRICT_CENTERS.items():
+        for name_suffix, category, indoor, tags in _POI_KINDS:
+            rng = _random.Random(_seed("poi", dist, name_suffix))
+            pid = f"p{n:03d}"
+            n += 1
+            intensity = rng.randint(1, 4)
+            wheelchair = indoor or rng.random() < 0.65
+            out.append(POI(
+                pid, f"{dist}{name_suffix}", category, dist,
+                _jitter(rng, clat), _jitter(rng, clng),
+                indoor, wheelchair, intensity,
+                round(rng.uniform(1.0, 3.0), 1),
+                rng.choice([0, 0, 0, 30, 50, 80]),
+                rng.choice(["09:00-18:00", "10:00-22:00", "06:00-22:00", "全天"]),
+                [f"{rng.randint(1, 12)}号线{dist}站"],
+                tags + ["合成数据"],
+                rng.randint(2, 5), rng.randint(2, 5),
+                f"{dist}{name_suffix}（合成种子数据，用于规模测试）",
+            ))
+    return out
+
+
+def _expand_restaurants():
+    out = []
+    n = 23
+    for dist, (clat, clng) in _DISTRICT_CENTERS.items():
+        for name_suffix, cuisine, light, tags in _RESTAURANT_KINDS:
+            rng = _random.Random(_seed("res", dist, name_suffix))
+            rid = f"r{n:03d}"
+            n += 1
+            out.append(Restaurant(
+                rid, f"{dist}{name_suffix}", dist,
+                _jitter(rng, clat), _jitter(rng, clng, 0.02),
+                cuisine, light,
+                rng.choice(["10:00-22:00", "11:00-21:30", "07:00-21:00", "11:00-次日02:00"]),
+                rng.random() < 0.75,
+                rng.choice([40, 60, 80, 100, 120, 150]),
+                rng.randint(3, 5), rng.randint(3, 5),
+                rng.choice([1, 1, 2, 2, 3]),
+                tags + ["合成数据"],
+            ))
+    return out
+
+
+def _expand_hotels():
+    out = []
+    for hid, name, dist in _NEW_HOTELS:
+        clat, clng = _DISTRICT_CENTERS[dist]
+        out.append(Hotel(hid, name, dist,
+                         round(clat - 0.010, 4), round(clng + 0.010, 4)))
+    return out
+
+
+POIS = POIS + _expand_pois()
+RESTAURANTS = RESTAURANTS + _expand_restaurants()
+HOTELS = HOTELS + _expand_hotels()
+
+
 def all_entities():
     """返回所有实体，供图存储与向量存储统一索引。"""
     return list(POIS) + list(RESTAURANTS) + list(HOTELS)

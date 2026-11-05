@@ -53,6 +53,10 @@ def schema_prompt() -> str:
     lines.append("  [ORDER BY n.elder DESC] [LIMIT 10]")
     lines.append("约束：仅支持单段 MATCH；比较运算符限 = / <= / >= / < / > / CONTAINS；"
                  "不要使用 IN 列表或多段 MATCH；字符串用 = 或 CONTAINS（如 n.cuisine CONTAINS '粤菜'）。")
-    lines.append("可用酒店名：深圳福田香格里拉大酒店 / 深圳湾万丽酒店 / "
-                 "深圳大梅沙京基洲际度假酒店 / 深圳龙岗中心城希尔顿酒店")
+    try:
+        from data.shenzhen import HOTELS
+        hotel_names = " / ".join(h.name for h in HOTELS)
+    except Exception:
+        hotel_names = "深圳福田香格里拉大酒店"
+    lines.append(f"可用酒店名：{hotel_names}")
     return "\n".join(lines)
