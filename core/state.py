@@ -57,6 +57,7 @@ class WorkerPayload(TypedDict, total=False):
     latency_ms: int
     data: Any
     error: str
+    attempts: list                   # Text2Cypher 的 Fallback 链路轨迹
 
 
 class TravelState(TypedDict, total=False):

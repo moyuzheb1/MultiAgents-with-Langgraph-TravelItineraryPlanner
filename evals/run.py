@@ -105,7 +105,7 @@ def test_critic_rules() -> None:
 
     # 卫生风险（海鲜排档 / 老人）
     cons3 = {"with_elderly": True}
-    plan3 = {"slots": [{"day": 1, "period": "晚餐", "kind": "dining", "ref_id": "r12", "name": "蛇口海鲜大排档"}]}
+    plan3 = {"slots": [{"day": 1, "period": "晚餐", "kind": "dining", "ref_id": "r17", "name": "盐田海鲜街"}]}
     vs3 = validate_plan(plan3, cons3, {}, "")
     codes3 = [v["code"] for v in vs3]
     check("海鲜排档 → HYGIENE_RISK", "HYGIENE_RISK" in codes3, str(codes3))
@@ -123,7 +123,7 @@ def test_replan_convergence() -> None:
     state.update(assembler_node(state))
     slots = list(state["plan"]["slots"])
     slots = [{"day": 1, "period": "上午", "kind": "poi", "ref_id": "p04", "name": "欢乐谷"}] + slots
-    slots.append({"day": 1, "period": "晚餐", "kind": "dining", "ref_id": "r12", "name": "蛇口海鲜大排档"})
+    slots.append({"day": 1, "period": "晚餐", "kind": "dining", "ref_id": "r17", "name": "盐田海鲜街"})
     state["plan"]["slots"] = slots
 
     r1 = critic_node(state)["critic_report"]
@@ -132,7 +132,7 @@ def test_replan_convergence() -> None:
     state.update(replanner_node(state))
     check("Replan 决策回跳 assembler", state["_next"] == "assembler")
     check("违规实体进入排除集", "p04" in state["constraints"].get("_exclude", [])
-          and "r12" in state["constraints"].get("_exclude", []))
+          and "r17" in state["constraints"].get("_exclude", []))
 
     state.update(assembler_node(state))
     r2 = critic_node(state)["critic_report"]

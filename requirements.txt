@@ -4,6 +4,9 @@ langchain-openai>=0.1.23
 langgraph>=0.2.14
 python-dotenv>=1.0.1
 pytest>=7.4
+pillow>=10.0
+folium>=0.17
+streamlit-folium>=0.21
 # 可选（未安装时自动回退到进程内零依赖实现）：
 # neo4j>=5.0
 # pymilvus>=2.4

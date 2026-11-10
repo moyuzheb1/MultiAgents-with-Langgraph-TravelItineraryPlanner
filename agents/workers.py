@@ -118,9 +118,10 @@ async def _poi_task(constraints, plan, ctx) -> WorkerPayload:
                                 vector_store=ctx["vector"])
         return WorkerPayload(source="graph_rag", status="degraded", data=rows,
                              latency_ms=int((time.time() - started) * 1000),
-                             error=res.error)
+                             error=res.error, attempts=res.attempts)
     return WorkerPayload(source=res.source, status=res.status, data=res.rows,
-                         latency_ms=res.latency_ms, error=res.error)
+                         latency_ms=res.latency_ms, error=res.error,
+                         attempts=res.attempts)
 
 
 async def _dining_task(constraints, plan, hotel_name, ctx) -> WorkerPayload:
@@ -142,9 +143,10 @@ async def _dining_task(constraints, plan, hotel_name, ctx) -> WorkerPayload:
                                 vector_store=ctx["vector"])
         return WorkerPayload(source="graph_rag", status="degraded", data=rows,
                              latency_ms=int((time.time() - started) * 1000),
-                             error=res.error)
+                             error=res.error, attempts=res.attempts)
     return WorkerPayload(source=res.source, status=res.status, data=res.rows,
-                         latency_ms=res.latency_ms, error=res.error)
+                         latency_ms=res.latency_ms, error=res.error,
+                         attempts=res.attempts)
 
 
 async def _weather_task(constraints, query) -> WorkerPayload:

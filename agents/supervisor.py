@@ -6,8 +6,11 @@
                                             └------全量--> planner  --> ...
 
 其中 replan → assembler 为「局部 State 更新」回跳，replan → planner 为升级后的全量重规划。
+
+`stream_trip()` 以 stream_mode="updates" 逐节点产出状态快照，供界面展示中间过程。
 """
 import os
+import time
 
 from langgraph.graph import END, StateGraph
 
@@ -155,3 +158,32 @@ def get_graph():
 def run_trip(query: str, session_id: str = "default") -> dict:
     """执行一次完整的 Supervisor-Worker 流程。"""
     return get_graph().invoke(initial_state(query, session_id))
+
+
+# 带 Annotated[..., operator.add] 归约器的字段，多节点写入时按追加合并
+_ADDITIVE_FIELDS = ("retrieval_trace", "replan_history", "warnings")
+
+
+def _merge_update(state: dict, update: dict) -> dict:
+    """把单节点产出的增量合并进状态快照，语义与图的归约器保持一致。"""
+    merged = dict(state)
+    for key, value in (update or {}).items():
+        if key in _ADDITIVE_FIELDS and isinstance(value, list):
+            merged[key] = list(merged.get(key) or []) + value
+        else:
+            merged[key] = value
+    return merged
+
+
+def stream_trip(query: str, session_id: str = "default"):
+    """逐节点执行，每完成一个节点 yield (节点名, 状态快照, 累计耗时秒)。
+
+    与 run_trip 走同一张图、同一套逻辑，仅把整段阻塞换成节点级流式，
+    供界面实时展示 router / planner / workers / critic / replan 的推进过程。
+    """
+    state = initial_state(query, session_id)
+    started = time.time()
+    for chunk in get_graph().stream(state, stream_mode="updates"):
+        for node, update in chunk.items():
+            state = _merge_update(state, update)
+            yield node, state, time.time() - started

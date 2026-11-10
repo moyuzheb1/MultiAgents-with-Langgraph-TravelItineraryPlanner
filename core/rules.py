@@ -9,7 +9,7 @@ from data.shenzhen import HOTELS, POIS, RESTAURANTS
 
 ENTITY_INDEX = {e.id: e for e in list(POIS) + list(RESTAURANTS) + list(HOTELS)}
 
-AREAS = ["南山区", "福田区", "罗湖区", "盐田区", "龙岗区", "宝安区", "龙华区", "光明区", "大鹏新区"]
+AREAS = ["南山区", "福田区", "罗湖区", "盐田区", "龙岗区", "宝安区", "龙华区", "光明区", "坪山区", "大鹏新区"]
 
 # 各时段的代表时刻（用于营业时间校验）
 PERIOD_HOUR = {"上午": 10, "午餐": 12, "下午": 15, "晚餐": 18}

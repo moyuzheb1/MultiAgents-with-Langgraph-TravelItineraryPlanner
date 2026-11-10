@@ -59,8 +59,11 @@ REWRITE_PROMPT = """下面这条 Cypher 执行失败，请根据错误原因重�
 
 要求：只输出修正后的 Cypher，不要解释文字或代码块标记。修正要点：
 - 删除 Schema 中不存在的属性与标签；
+- 距离酒店的条件只能写在 NEAR 关系的 max_km 属性里；若错误涉及 near.max_km 或任何
+  关系变量点属性，删除该 WHERE 条件并把距离移回关系，不要在 WHERE 里访问关系变量；
+- WHERE 条件只能写成 n.属性 运算符 值，属性必须属于该标签的白名单；
 - 确保比较运算两侧类型一致；
-- 保留 LIMIT。
+- 保留 LIMIT，只输出一条单段 MATCH 语句。
 """
 
 
@@ -80,9 +83,11 @@ def _cache_key(question: str, label_hint: str, constraints: str) -> str:
     return "t2c:" + hashlib.md5(raw.encode("utf-8")).hexdigest()
 
 
-async def _generate_cypher(question: str, constraints: dict, label_hint: str, limit: int) -> str:
+async def _generate_cypher(question: str, constraints: dict, label_hint: str,
+                           limit: int) -> tuple[str, str]:
+    """返回 (Cypher, 错误)；异常不再被吞成空串，链路里能看到真实原因。"""
     try:
-        llm = get_llm()
+        llm = get_llm(temperature=0)
         prompt = GENERATE_PROMPT.format(
             schema=schema_prompt(),
             constraints=constraints or "无",
@@ -91,22 +96,21 @@ async def _generate_cypher(question: str, constraints: dict, label_hint: str, li
             label_hint=label_hint,
         )
         resp = await llm.ainvoke([{"role": "user", "content": prompt}])
-        return _extract_cypher(resp.content)
+        return _extract_cypher(resp.content), ""
     except Exception as e:
-        # LLM 调用失败：返回空，交由 Fallback Pipeline 进入重写/向量降级
-        return ""
+        return "", f"{type(e).__name__}: {e}"
 
 
-async def _rewrite_cypher(question: str, cypher: str, error: str) -> str:
+async def _rewrite_cypher(question: str, cypher: str, error: str) -> tuple[str, str]:
     try:
-        llm = get_llm()
+        llm = get_llm(temperature=0)
         prompt = REWRITE_PROMPT.format(
             schema=schema_prompt(), question=question, cypher=cypher, error=error
         )
         resp = await llm.ainvoke([{"role": "user", "content": prompt}])
-        return _extract_cypher(resp.content)
-    except Exception:
-        return ""
+        return _extract_cypher(resp.content), ""
+    except Exception as e:
+        return "", f"{type(e).__name__}: {e}"
 
 
 def _vector_downgrade(question: str, label_hint: str, top_k: int, vector_store) -> list[dict]:
@@ -140,12 +144,21 @@ async def retrieve(
     cypher = ""
     last_error = ""
     for attempt in range(max_rewrite + 1):
+        step = "llm_generate" if attempt == 0 else "llm_rewrite"
+        if attempt == 0:
+            cypher, llm_error = await _generate_cypher(
+                question, constraints, label_hint, top_k)
+        else:
+            cypher, llm_error = await _rewrite_cypher(question, cypher, last_error)
+        if llm_error:
+            last_error = llm_error
+            result.attempts.append({"step": step, "attempt": attempt,
+                                    "status": "error", "error": llm_error})
+        if not cypher:
+            result.attempts.append({"step": step, "attempt": attempt,
+                                    "status": "empty", "error": last_error})
+            continue
         try:
-            if attempt == 0:
-                cypher = await _generate_cypher(question, constraints, label_hint, top_k)
-            else:
-                cypher = await _rewrite_cypher(question, cypher, last_error)
-
             # 第 2 步：AST / Schema 校验
             parse_cypher(cypher)
             result.attempts.append({"step": "validate", "attempt": attempt, "status": "ok", "cypher": cypher})
@@ -196,7 +209,8 @@ async def retrieve(
         result.error = f"{last_error} | 向量降级失败: {e}"
         result.attempts.append({"step": "vector_downgrade", "status": "error", "error": str(e)})
 
-    result.error = last_error
+    if not result.error:
+        result.error = last_error
     result.latency_ms = int((time.time() - started) * 1000)
     return result
 

@@ -78,7 +78,14 @@
 | 向量 | `MILVUS_URI` | 字符二元组 TF-IDF 余弦（无需 embedding） |
 | 缓存 | `REDIS_URL` | 进程内 TTL 缓存 |
 
-种子知识库为「深圳家庭游」示例数据（`data/shenzhen.py`），共约 **195 个实体**（109 个 POI / 76 家餐厅 / 10 家酒店）。其中前 54 个为人工整理的种子数据，其余为**程序化合成的扩展数据**（用于检索与评测规模测试，坐标为区中心附近的合理占位值）；接入真实业务时替换为权威数据源即可。
+知识库为「深圳家庭游」真实地点数据（`data/shenzhen.py`），共 **193 个实体**（107 个景点 / 74 家餐厅 / 12 家酒店），全部为深圳真实存在的地点，**不含程序化合成的占位实体**：
+
+- 覆盖南山、福田、罗湖、盐田、龙岗、宝安、龙华、光明、坪山、大鹏新区 10 个区域；
+- 每个景点带体力强度、是否室内、是否无障碍、门票、开放时间、地铁站、亲子/老人适配度与一句话提示；
+- 餐厅以真实老字号与连锁品牌为主（点都德、陶陶居、八合里海记、润园四季、面点王、嘉旺……），带清淡指数、人均、卫生风险；
+- 坐标取公开地图的街区级近似值，门票与营业时间为公开信息近似值，**出行前请以景区/商户当日公告为准**。
+
+配图位于 `static/photos/`（每张图对应 `manifest.json` 中的标题与来源页）。图片由 `scripts/fetch_photos.py` 从公开图文检索中抓取，**只接受标题命中地点名的候选**，因此不会出现同名异地或无关配图；抓不到可靠实景图的地点会退回排版占位，不使用 AI 生成图。图片仅用于本地演示，正式发布前请替换为授权素材。
 
 ---
 
@@ -103,7 +110,10 @@ MultiAgents-with-Langgraph-TravelItineraryPlanner/
 │   ├── router.py / planner.py / workers.py / assembler.py
 │   ├── critic.py / replanner.py / supervisor.py
 │   └── __init__.py
-├── data/shenzhen.py    # 深圳种子知识库（195 实体，含合成扩展）
+├── data/shenzhen.py    # 深圳真实地点知识库（193 实体）
+├── static/photos/      # 实景配图（按实体 id 命名，附 manifest.json 来源记录）
+├── scripts/
+│   └── fetch_photos.py # 抓取/更新实景配图（含标题相关性过滤与裁切）
 ├── evals/run.py        # 可执行回归脚本（验证三大防御机制）
 ├── tests/              # pytest 测试套件（CI 使用）
 ├── legacy/             # 原始开源项目的遗留 agent（仅存档，不参与运行）
@@ -140,8 +150,24 @@ streamlit run travel_agent.py
 
 控制台提供：
 - **两种模式**：⚡ 快速模式（确定性，秒级）/ 🤖 智能体增强（LLM，较慢但更智能）
-- 行程结果、检索链路（Text2Cypher Fallback）、Critic 校验报告、Replan 回跳历史、三层记忆、架构 DAG 可视化
+- 行程结果（每个点位配实景缩略图）、检索链路（Text2Cypher Fallback）、Critic 校验报告、Replan 回跳历史、三层记忆、架构 DAG 可视化
 - 一键导出 Markdown 行程
+
+地图（Leaflet / folium 渲染，瓦片为普通图片，不依赖 WebGL）：
+- 底图为纯卫星影像（高德 `style=6`），不叠注记层，压低饱和与亮度作为背景，路线与点位才是主角；
+- 点位与路线使用高德 GCJ-02 坐标，程序内置 WGS-84 → GCJ-02 纠偏，避免整体偏移数百米；
+- 路线走 OSRM 真实道路折线；**同一天内按「段」配色**（同色系由浅到深表示先后顺序），每段带方向箭头；
+- 「全部 / 第 N 天」切换避免多天路线挤在一起；点行程中的「地图」按钮可定位并高亮该点，同时自动切到对应天。
+
+> 瓦片与路径服务均为公开演示接口（AutoNavi / OSRM demo），商用请自行申请授权或替换 `AMAP_SAT`、`AMAP_ANNO`、`_osrm_route`。
+
+配图维护（可选，需要联网）：
+
+```powershell
+python scripts/fetch_photos.py            # 只补齐缺失的配图
+python scripts/fetch_photos.py --report   # 查看覆盖情况
+python scripts/fetch_photos.py --force    # 全部重抓
+```
 
 ## 测试与回归
 
