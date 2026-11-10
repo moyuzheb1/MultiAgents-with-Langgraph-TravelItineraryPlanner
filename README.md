@@ -161,7 +161,7 @@ streamlit run travel_agent.py
 
 > 瓦片与路径服务均为公开演示接口（AutoNavi / OSRM demo），商用请自行申请授权或替换 `AMAP_SAT`、`AMAP_ANNO`、`_osrm_route`。
 
-配图维护（可选，需要联网）：
+配图维护（需要联网）。抓取到的照片属第三方版权素材，**不随仓库分发**，克隆后执行一次即可补齐；不执行时界面会退回排版占位：
 
 ```powershell
 python scripts/fetch_photos.py            # 只补齐缺失的配图
